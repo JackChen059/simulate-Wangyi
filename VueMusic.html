@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title></title>
+  <link rel="stylesheet" href="">
+  <style>
+    #box{
+      height:38px;
+      width: 600px;
+      float: right;
+      border:1px solid blue;
+    }
+    li{
+      float:left;
+      height:200px;
+      width: 100px;
+      border:1px solid green;
+      list-style-type: none;
+    }
+    img{
+      height:100px;
+      width: 100%;
+    }
+    p{
+      width: 100%;
+      height:20px;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+  <p>{{lastLyric}}</p>
+  <input type="text" v-model="ipt" placeholder="">
+    <input type="button" value="search" id="ipt" v-on:click='search'>
+    <div id="box" v-if='songSource'>
+      <audio :src="songSource" autoplay controls ref='audio'></audio>
+    </div>
+    <ul v-if='song'>
+      <li v-for="item in song.songs">
+        <img v-bind:src="item.al.picUrl" alt="" v-on:click="playSong(item.id)">
+        <p>{{item.name}}</p>
+      </li>
+    </ul>
+  </div>
+</body>
+</html>
+<script src='../vue.js'></script>
+<script src='../vue-resource@1.3.4'></script>
+<script src='../jquery-1.11.3.js'></script>
+<script>
+let app = new Vue({
+  el:'#app',
+  data:{
+    ipt:'童话',
+    song:null,
+    songSource:null,
+    afterLyric:null,
+    lastLyric:null,
+  },
+  methods:{
+    // var _this = tihs;
+    search:function(){
+
+      this.$http.get('https://api.imjad.cn/cloudmusic/?type=search&s='+this.ipt).then(response =>{
+        this.song = response.body.result;
+      // console.log(this);
+      },error => {
+        alert(error)
+      })
+      // $.ajax({
+      //   url: 'https://api.imjad.cn/cloudmusic/?type=search&s='+this.ipt,
+      //   type: 'get',
+      //   async:true,
+      //   success: (data) =>{
+      //   this.song = data.result;
+      //   console.log(this.song);
+      //   }
+        // success:function(data) {
+        //   console.log(data);
+        //   _this.song=data.reult
+        // }
+      // })
+    },
+    playSong:function(id){
+
+      this.$http.get('https://api.imjad.cn/cloudmusic/?type=song&br=128000&id='+id).then(response =>{
+        this.songSource = response.body.data[0].url;
+      },error => {
+        alert(error)
+      })
+      // var _this = this;
+      // $.ajax({
+      //   url: 'https://api.imjad.cn/cloudmusic/?type=song&br=128000&id='+id,
+      //   type: 'get',
+      //   async:true,
+      //   success:(data)=>{
+      //     console.log(data);
+      //     this.songSource = data.data[0].url;
+      //   }
+      // })
+      // 歌词
+      this.$http.get('https://api.imjad.cn/cloudmusic/?type=lyric&id='+id).then(response=>{
+        this.lyric = response.body.lrc.lyric
+        // console.log(this.lyric)
+
+        //正则换行表达式
+        var rgeN = /\n/;
+        this.afterLyric = this.lyric.split(rgeN)
+        // console.log(this.afterLyric.length);
+
+        // 匹配歌词时间
+        let lyricTime = /\[\d{2}\:\d{2,3}\.\d{1,3}\]/;
+        var afterTime = [];
+        for(var i=0;i<this.afterLyric.length;i++){
+          afterTime.push(this.afterLyric[i].match(lyricTime));
+          // console.log(afterTime);
+        }
+
+        //匹配歌词
+        let lyricBody = [];
+        for(var i=0;i<this.afterLyric.length;i++){
+          this.afterLyric[i]=this.afterLyric[i].replace(lyricTime,'');
+          lyricBody.push(this.afterLyric[i]);
+        }
+        // console.log(this.afterLyric);
+
+        //合并时间歌词
+          let af = [];
+          var t = [];
+          console.log(afterTime.length);
+          for(let i=0;i<afterTime.length-1;i++){
+            // [00:00.000]
+            t = afterTime[i].toString().slice(1,-1).split(":");
+            console.log(t);
+            t= parseInt(t[0],10) * 60 + parseInt(t[1]);
+            af[i] = [t,lyricBody[i]];
+          }
+          console.log(af.length);
+          //播放器匹配歌词
+          // console.log(this)
+          var _this = this;
+          this.$refs.audio.ontimeupdate =function(){
+            // console.log('1');
+            for(var i = 0;i<af.length;i++){
+              // console.log("2");
+              if(this.currentTime > af[i][0]){
+                _this.lastLyric = af[i][1];
+                console.log(af[i][1]);
+              }
+              // if(this.currentTime > af[i][0]){
+              //   _this.finalLyric =  af[i][1];
+              //   console.log(af[i][1])
+              // }
+            }
+          }
+      })
+    },
+
+  }
+})
+</script>
